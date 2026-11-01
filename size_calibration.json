@@ -1,0 +1,32 @@
+{
+  "0": {
+    "area_at_1x": 866.0,
+    "width_at_1x": 33.0,
+    "reference_item": 0,
+    "reference_scale": 1.0
+  },
+  "1": {
+    "area_at_1x": 1051.5,
+    "width_at_1x": 34.0,
+    "reference_item": 1,
+    "reference_scale": 1.0
+  },
+  "2": {
+    "area_at_1x": 846.0,
+    "width_at_1x": 36.0,
+    "reference_item": 2,
+    "reference_scale": 1.0
+  },
+  "3": {
+    "area_at_1x": 708.5,
+    "width_at_1x": 31.07857894897461,
+    "reference_item": 3,
+    "reference_scale": 1.0
+  },
+  "4": {
+    "area_at_1x": 672.0,
+    "width_at_1x": 29.0,
+    "reference_item": 5,
+    "reference_scale": 1.0
+  }
+}

@@ -1,0 +1,11 @@
+numpy
+torch
+mujoco
+opencv-python-headless
+Pillow
+scipy
+matplotlib
+reportlab
+gTTS
+imageio
+imageio-ffmpeg
