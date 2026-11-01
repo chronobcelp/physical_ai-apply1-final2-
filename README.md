@@ -1,54 +1,219 @@
-# AI Bento Plating Robot 3D — Six Compartments
+# AIお弁当盛り付けロボット（3D・6マス版）
 
-## Overview
+**画像から食品の「位置・種類・大きさ」を判断し、3本爪のロボットアームで6マスのお弁当を盛り付けるPhysical AIのシミュレーション作品です。**
 
-MuJoCo-based 3D robotic bento plating system.
+MuJoCoで作成した3D作業台に、普通サイズ・特大サイズの食品を混在させます。
 
-Features:
-- Six-compartment bento box (2 × 3)
-- Normal-size and oversized food items
-- CNN food classification
-- RGB-D food size estimation
-- Image-based food center localization
-- Three-finger robotic claw
-- Baseline vs AI comparison
-- Japanese-narrated 120-second video
+従来の「置かれた順番に盛り付ける方式」と、AIを活用して「必要な食品だけを正しい区画に運ぶ方式」を、同じ初期条件で比較します。
 
-## Main files
+## 1. 作品の目的
 
-- `scene_3d.py` — MuJoCo scene and robot
-- `vision_model.py` — CNN and RGB-D vision
-- `run_project.py` — Training and evaluation
-- `make_video.py` — Video and narration
-- `make_report.py` — PDF report
+食品の順番が変わったり、規格外サイズの食品が混ざったりすると、固定順の盛り付けでは誤配置が発生します。
 
-## Reproduction
+本作品では、次の技術を組み合わせて自動盛り付けに取り組みます。
 
-Install dependencies using `requirements.txt`, then run:
+- **位置検出**：RGB-D画像から食品の中心座標を計算する。
+- **種類認識**：CNNで5種類の食品を分類する。
+- **サイズ判定**：深度画像から大きさを推定する。
+- **配置計画**：注文に合う食品を選んで6区画へ配置する。
+- **規格外品の回収**：特大・余剰・注文外の食品を回収トレーへ運ぶ。
+- **結果の評価**：従来方式とAI方式を比較する。
+
+## 2. お弁当の仕様
+
+弁当箱は2行×3列の6区画です。
+
+| ① おにぎり | ② 卵焼き | ③ ブロッコリー |
+|---|---|---|
+| ④ 唐揚げ | ⑤ おにぎり | ⑥ 卵焼き |
+
+供給トレーには、各シーンで9個の食品を配置します。
+
+食品のサイズは、普通サイズと特大サイズの2種類です。
+
+| 食品 | 相対サイズ | 処理 |
+|---|---:|---|
+| 普通サイズの食品 | 1.00倍 | 注文と一致すれば盛り付け |
+| 特大おにぎり | 1.55倍 | 規格外として回収 |
+| 特大卵焼き | 1.50倍 | 規格外として回収 |
+| トマト | 1.00倍 | 注文外として回収 |
+
+ブロッコリーの欠品や食品の順番の入れ替わりも評価します。
+
+## 3. 使用技術とシステム構成
+
+### 画像認識
+
+上方カメラのRGB-D画像を取得し、空の作業台との差分から食品領域を抽出します。
+
+供給トレーの9セルを利用して各食品の輪郭と中心点を求めます。
+
+画像上の中心座標をカメラ校正によって実空間XY座標に変換し、ロボットの移動目標に利用します。
+
+### CNNによる食品分類
+
+PyTorchで実装したCNNを使用し、次の5クラスを識別します。
+
+1. おにぎり
+2. 卵焼き
+3. ブロッコリー
+4. 唐揚げ
+5. トマト（注文外）
+
+### RGB-Dによるサイズ判定
+
+深度画像から食品の輪郭を抽出し、校正済みの基準値と比較してサイズ倍率を推定します。
+
+規格に収まる食品を盛り付け候補とし、規格外の食品を回収します。
+
+### ロボット制御
+
+MuJoCoでSCARA型4自由度アームと3本爪グリッパーを再現しています。
+
+動作は次の流れです。
+
+**爪を開く → 食品へ移動 → 下降 → 爪を閉じる → 持ち上げる → 指定区画へ移動 → 食品を離す**
+
+ロボットの移動には解析的逆運動学を使用します。
+
+なお、爪は開閉しますが、食品の保持には簡易的なキネマティック拘束を使用しています。
+
+## 4. 従来方式とAI方式の比較
+
+4つの方式を同じ条件で評価します。
+
+| 方式 | 種類認識 | サイズ判定 | 特徴 |
+|---|---|---|---|
+| 従来方式 | なし | なし | 固定順で配置 |
+| CNNのみ | CNN | なし | 種類だけで選択 |
+| 提案AI | CNN | RGB-D | 種類とサイズで選択 |
+| 理想識別 | 真値 | 真値 | 参考上限。学習済みAIではない |
+
+動画では、ブロッコリーが欠品した同じシーンを左右に並べて比較します。
+
+**AI方式が常に成功すると仮定せず、誤認識や配置失敗も実際の評価結果に含めます。**
+
+## 5. 評価結果
+
+最新版の説明資料に記載された一実行の結果です。
+
+評価条件：
+
+- CNN学習画像：700枚
+- 検証画像：125枚
+- 学習：20エポック
+- 評価：4シーン、計36食品
+
+| 評価項目 | 従来方式 | 提案AI | 理想識別 |
+|---|---:|---:|---:|
+| 食品取扱正解率 | 33.3% | **86.1%** | 100.0% |
+| 6区画最終配置正解率 | 41.7% | **79.2%** | 100.0% |
+| 区画別欠品判定精度 | 95.8% | 83.3% | 100.0% |
+
+その他の結果：
+
+- CNN食品分類正解率：91.7%
+- サイズ規格判定一致率：94.4%
+- 規格外食品回収率：100.0%
+- 画像中心XY座標の推定平均絶対誤差：5.3 mm
+- CNNのみ・サイズ判定なしの食品取扱正解率：63.9%
+
+提案AIでは食品の種類とサイズを組み合わせることで、食品取扱正解率を改善できました。
+
+ただし、欠品判定など一部の指標では従来方式より低い結果があり、今後の改善課題となっています。
+
+これらは限られたシミュレーション条件における結果です。
+
+## 6. Google Colabでの実行方法
+
+`bento6_vision_detection_FIXED.ipynb` をGoogle Colabで開いてください。
+
+1. STEP 1～3：ライブラリ導入、3Dシーンと食品位置検出の確認
+2. STEP 4：学習条件・評価条件の設定
+3. STEP 5：CNN学習、4方式の比較、3Dロボット操作、録画
+4. STEP 6：実測結果、画像検出結果、120秒動画の確認
+5. STEP 8：生成した評価結果・動画・PDFのダウンロード
+
+初回は `QUICK_TEST=True` で短縮動作確認を行い、本番では `False` にします。
+
+学習済みの `food_cnn.pt` が存在する場合のみ、`REUSE_MODEL=True` にして再利用できます。
+
+### Pythonから実行する場合
+
+必要なライブラリを導入します。
 
 ```bash
-python run_project.py --out results_bento6_vision --train-n 500 --val-n 125 --epochs 10 --scenes 4 --seed 31031
+python -m pip install -r requirements.txt
 ```
 
+画像検出と6区画のテスト：
 
-## Evaluation results
+```bash
+python test_centers_merged.py
+python test_six_slots.py
+```
 
-- Scenes: 4
-- Baseline success rate: 33.3%
-- CNN without size judgment: 63.9%
-- Proposed AI success rate: 86.1%
-- Oracle reference: 100.0%
-- Oversize rejection recall: 100.0%
+短縮テスト：
 
-Results are from the simulation described in `results/summary.json`.
+```bash
+python run_project.py --out results_bento6_vision_quick --quick
+```
 
+本番実行例：
 
-## Limitations
+```bash
+python run_project.py \
+  --out results_bento6_vision \
+  --train-n 700 \
+  --val-n 125 \
+  --epochs 20 \
+  --scenes 4 \
+  --seed 31031
+```
 
-The robot uses a simplified kinematic grasp constraint.
-Image localization uses known supply-cell regions.
-The system has been evaluated in simulation, not on a real robot.
+本番実行では、実際のMuJoCo録画から日本語音声・字幕付き120秒MP4を生成します。
 
-## Demo
+ナレーションは一定速度で再生し、指定区間に入りきらない場合は短い説明文へ切り替えます。
 
-Add the public YouTube video URL here.
+音声合成にはインターネット接続が必要です。
+
+## 7. ソースコードの構成
+
+| ファイル | 内容 |
+|---|---|
+| `bento6_vision_detection_FIXED.ipynb` | Colab実行用Notebook |
+| `scene_3d.py` | 3D作業台、6区画、3本爪ロボット |
+| `vision_model.py` | CNN、RGB-Dサイズ判定、中心座標検出 |
+| `run_project.py` | 学習、配置計画、評価、録画 |
+| `make_video.py` | 日本語音声・字幕付き120秒動画 |
+| `make_report.py` | 評価結果PDF |
+| `requirements.txt` | 必要なライブラリ |
+| `test_*.py` | 各種単体テスト |
+| `FIX_8_OF_9_JA.md` | 食品位置検出の修正内容 |
+
+## 8. 主な出力ファイル
+
+| 出力ファイル | 内容 |
+|---|---|
+| `summary.json` | 実測成功率と評価条件 |
+| `evaluation_detail.csv` | 食品ごとの推論・処理結果 |
+| `compartment_audit.csv` | 6区画の配置後検査 |
+| `localization_detail.csv` | 検出座標と評価用真値の誤差 |
+| `detection_overlay_scene1.png` | 画像上の食品中心点 |
+| `PAI_Bento3D_120s.mp4` | 日本語音声付き比較動画 |
+| `説明資料_PAI最終課題_CHRONO_10.pdf` | 実測評価の説明資料 |
+
+これらは通常、`results_bento6_vision/` 以下に生成されます。
+
+## 9. 現在の限界と今後の課題
+
+本作品はPhysical AIの概念実証であり、以下の制約があります。
+
+- 食品の中心位置は画像から推定していますが、供給トレーの9セル配置は既知として利用しています。
+- 食品の位置検出は、学習済み物体検出AIではなく深度画像処理です。
+- 3本爪の保持には簡易拘束を使用し、実際の接触力や滑りは評価していません。
+- 配置後の正誤検査では、MuJoCoの真値情報を利用しています。
+- 実食品、実機ロボット、未知の背景や照明では未検証です。
+
+今後は、自由配置への対応、実際の接触に基づく把持、認識失敗時の再撮影・再挑戦、ランダムシーンでの汎化評価を目指します。
+
